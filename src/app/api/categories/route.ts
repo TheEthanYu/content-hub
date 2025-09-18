@@ -4,9 +4,19 @@ import { desc, eq } from 'drizzle-orm'
 import { generateSlug } from '@/lib/utils'
 
 // 获取分类列表
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const categoriesData = await db.select().from(categories).orderBy(desc(categories.createdAt))
+    const { searchParams } = new URL(request.url)
+    const websiteId = searchParams.get('websiteId')
+
+    let query = db.select().from(categories).orderBy(desc(categories.createdAt))
+
+    // 如果指定了网站ID，只返回该网站的分类
+    if (websiteId) {
+      query = db.select().from(categories).where(eq(categories.websiteId, websiteId)).orderBy(desc(categories.createdAt))
+    }
+
+    const categoriesData = await query
 
     return NextResponse.json({
       success: true,
@@ -22,15 +32,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, description, color } = body
+    const { name, description, color, websiteId } = body
 
     if (!name) {
       return NextResponse.json({ success: false, message: '分类名称不能为空' }, { status: 400 })
     }
 
+    if (!websiteId) {
+      return NextResponse.json({ success: false, message: '网站ID不能为空' }, { status: 400 })
+    }
+
     const slug = generateSlug(name)
 
-    // 检查是否已存在相同slug的分类
+    // 检查同一网站内是否已存在相同slug的分类
     const existingCategory = await db.select().from(categories).where(eq(categories.slug, slug)).limit(1)
 
     if (existingCategory.length > 0) {
@@ -40,6 +54,7 @@ export async function POST(request: NextRequest) {
     const [newCategory] = await db
       .insert(categories)
       .values({
+        websiteId,
         name,
         slug,
         description,

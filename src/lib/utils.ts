@@ -99,32 +99,71 @@ export function deduplicateKeywords(keywords: string[]): string[] {
   return result
 }
 
-export function parseKeywordImport(content: string): string[] {
-  // 支持多种格式：逗号分隔、换行分隔、CSV格式等
-  const lines = content.split(/[\n\r]+/)
-  const keywords: string[] = []
+export interface ParsedKeyword {
+  keyword: string
+  searchVolume?: number
+  difficulty?: number
+  competition?: string
+  priority?: number
+}
 
-  for (const line of lines) {
-    if (line.trim()) {
-      // 处理CSV格式（可能有多列，关键词在第一列）
-      const csvMatch = line.match(/^"([^"]+)"|^([^,]+)/)
-      if (csvMatch) {
-        const keyword = (csvMatch[1] || csvMatch[2]).trim()
-        if (keyword) {
-          keywords.push(keyword)
+export function parseKeywordImport(content: string): ParsedKeyword[] {
+  // 支持多种格式：逗号分隔、换行分隔、CSV格式等
+  const lines = content.split(/[\n\r]+/).filter(line => line.trim())
+  const keywords: ParsedKeyword[] = []
+
+  // 检查是否是CSV格式（有标题行）
+  const firstLine = lines[0]?.toLowerCase()
+  const isCSV = firstLine && (firstLine.includes('关键词') || firstLine.includes('keyword') || firstLine.includes('搜索量') || firstLine.includes('volume'))
+
+  const startIndex = isCSV ? 1 : 0 // 如果有标题行，跳过第一行
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+
+    // 尝试解析CSV格式
+    const parts = line.split(',').map(part => part.replace(/^"|"$/g, '').trim())
+
+    if (parts.length >= 1) {
+      const keyword = parts[0]
+      if (keyword && keyword !== '关键词' && keyword !== 'keyword') {
+        const parsed: ParsedKeyword = {
+          keyword,
+          searchVolume: parts[1] ? parseInt(parts[1]) || 0 : undefined,
+          difficulty: parts[2] ? parseInt(parts[2]) || 0 : undefined,
+          competition: parts[3] || undefined,
+          priority: parts[4] ? parseInt(parts[4]) || 1 : 1
         }
-      } else {
-        // 处理逗号分隔
-        const commaKeywords = line
-          .split(',')
-          .map(k => k.trim())
-          .filter(k => k)
-        keywords.push(...commaKeywords)
+        keywords.push(parsed)
       }
     }
   }
 
-  return deduplicateKeywords(keywords)
+  // 如果没有解析到CSV格式的数据，尝试简单的关键词列表
+  if (keywords.length === 0) {
+    for (const line of lines) {
+      if (line.trim()) {
+        // 处理逗号分隔的关键词
+        const simpleKeywords = line
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k)
+        keywords.push(...simpleKeywords.map(keyword => ({ keyword, priority: 1 })))
+      }
+    }
+  }
+
+  // 去重
+  const seen = new Set<string>()
+  return keywords.filter(item => {
+    const normalized = normalizeKeyword(item.keyword)
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized)
+      return true
+    }
+    return false
+  })
 }
 
 export function getKeywordPlanStatusColor(status: string): string {

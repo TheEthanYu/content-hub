@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, keywordPlans, websites, categories } from '@/lib/db'
 import { desc, eq, like, or, and } from 'drizzle-orm'
-import { generateKeywordHash, normalizeKeyword, parseKeywordImport } from '@/lib/utils'
+import { generateKeywordHash, normalizeKeyword, parseKeywordImport, type ParsedKeyword } from '@/lib/utils'
 
 // 获取关键词计划列表
 export async function GET(request: NextRequest) {
@@ -128,8 +128,15 @@ export async function POST(request: NextRequest) {
     const duplicates = []
     const errors = []
 
-    for (const keyword of keywords) {
+    for (const keywordData of keywords) {
       try {
+        // 支持字符串或对象格式
+        const keyword = typeof keywordData === 'string' ? keywordData : keywordData.keyword
+        const searchVolume = typeof keywordData === 'object' ? keywordData.searchVolume : undefined
+        const difficulty = typeof keywordData === 'object' ? keywordData.difficulty : undefined
+        const competition = typeof keywordData === 'object' ? keywordData.competition : undefined
+        const keywordPriority = typeof keywordData === 'object' ? keywordData.priority : priority
+
         const normalizedKeyword = normalizeKeyword(keyword)
         if (!normalizedKeyword) continue
 
@@ -150,7 +157,10 @@ export async function POST(request: NextRequest) {
             categoryId: categoryId || null,
             keyword: keyword.trim(),
             keywordHash,
-            priority,
+            searchVolume: searchVolume || 0,
+            difficulty: difficulty || 0,
+            competition,
+            priority: keywordPriority || 1,
             importSource,
             importBatch
           })
@@ -158,8 +168,8 @@ export async function POST(request: NextRequest) {
 
         newKeywordPlans.push(newPlan)
       } catch (error) {
-        console.error(`处理关键词 "${keyword}" 失败:`, error)
-        errors.push(keyword)
+        console.error(`处理关键词 "${typeof keywordData === 'string' ? keywordData : keywordData.keyword}" 失败:`, error)
+        errors.push(typeof keywordData === 'string' ? keywordData : keywordData.keyword)
       }
     }
 
