@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileText, FolderOpen, Home, Settings } from 'lucide-react';
+import { FileText, FolderOpen, Home, Settings, Globe, Hash, Zap } from 'lucide-react';
 
 export default function AdminLayout({
   children,
@@ -27,27 +27,76 @@ export default function AdminLayout({
               <Home className="w-5 h-5 mr-3" />
               首页
             </Link>
-            <Link
-              href="/admin/articles"
-              className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <FileText className="w-5 h-5 mr-3" />
-              文章管理
-            </Link>
-            <Link
-              href="/admin/categories"
-              className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <FolderOpen className="w-5 h-5 mr-3" />
-              分类管理
-            </Link>
-            <Link
-              href="/admin/settings"
-              className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <Settings className="w-5 h-5 mr-3" />
-              系统设置
-            </Link>
+            
+            {/* 网站管理 */}
+            <div className="pt-4">
+              <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                网站管理
+              </div>
+              <Link
+                href="/admin/websites"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Globe className="w-5 h-5 mr-3" />
+                网站列表
+              </Link>
+            </div>
+
+            {/* 内容管理 */}
+            <div className="pt-4">
+              <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                内容管理
+              </div>
+              <Link
+                href="/admin/keyword-plans"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Hash className="w-5 h-5 mr-3" />
+                关键词计划
+              </Link>
+              <Link
+                href="/admin/articles"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <FileText className="w-5 h-5 mr-3" />
+                文章管理
+              </Link>
+              <Link
+                href="/admin/categories"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <FolderOpen className="w-5 h-5 mr-3" />
+                分类管理
+              </Link>
+            </div>
+
+            {/* 自动化 */}
+            <div className="pt-4">
+              <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                自动化
+              </div>
+              <Link
+                href="/admin/generation-tasks"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Zap className="w-5 h-5 mr-3" />
+                生成任务
+              </Link>
+            </div>
+
+            {/* 系统 */}
+            <div className="pt-4">
+              <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                系统
+              </div>
+              <Link
+                href="/admin/settings"
+                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <Settings className="w-5 h-5 mr-3" />
+                系统设置
+              </Link>
+            </div>
           </nav>
         </div>
       </div>
