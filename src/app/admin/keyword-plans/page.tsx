@@ -47,6 +47,7 @@ export default function KeywordPlansPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showImportForm, setShowImportForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   
   // 筛选状态
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,6 +62,18 @@ export default function KeywordPlansPage() {
     content: '',
     importSource: 'excel'
   });
+
+  // 手动添加表单状态
+  const [addForm, setAddForm] = useState({
+    keyword: '',
+    websiteId: '',
+    categoryId: '',
+    searchVolume: '',
+    difficulty: '',
+    competition: 'medium',
+    priority: '1'
+  });
+  const [adding, setAdding] = useState(false);
 
   // 获取关键词计划列表
   const fetchKeywordPlans = async () => {
@@ -103,6 +116,20 @@ export default function KeywordPlansPage() {
       if (selectedWebsite) params.append('websiteId', selectedWebsite);
       
       const response = await fetch(`/api/categories?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (error) {
+      console.error('获取分类列表失败:', error);
+    }
+  };
+
+  // 获取特定网站的分类列表
+  const fetchCategoriesByWebsite = async (websiteId: string) => {
+    try {
+      const response = await fetch(`/api/categories?websiteId=${websiteId}`);
       const data = await response.json();
       
       if (data.success) {
@@ -184,6 +211,66 @@ export default function KeywordPlansPage() {
     }
   };
 
+  // 手动添加关键词
+  const handleAddKeyword = async () => {
+    if (!addForm.keyword.trim()) {
+      alert('请输入关键词');
+      return;
+    }
+    if (!addForm.websiteId) {
+      alert('请选择网站');
+      return;
+    }
+    if (!addForm.categoryId) {
+      alert('请选择分类');
+      return;
+    }
+
+    try {
+      setAdding(true);
+      const response = await fetch('/api/keyword-plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          keyword: addForm.keyword.trim(),
+          websiteId: addForm.websiteId,
+          categoryId: addForm.categoryId,
+          searchVolume: addForm.searchVolume ? parseInt(addForm.searchVolume) : null,
+          difficulty: addForm.difficulty ? parseInt(addForm.difficulty) : null,
+          competition: addForm.competition || null,
+          priority: parseInt(addForm.priority),
+          status: 'pending'
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('关键词添加成功');
+        setShowAddForm(false);
+        setAddForm({
+          keyword: '',
+          websiteId: '',
+          categoryId: '',
+          searchVolume: '',
+          difficulty: '',
+          competition: 'medium',
+          priority: '1'
+        });
+        fetchKeywordPlans();
+      } else {
+        alert(data.message || '添加失败');
+      }
+    } catch (error) {
+      console.error('添加关键词失败:', error);
+      alert('添加失败');
+    } finally {
+      setAdding(false);
+    }
+  };
+
   // 删除关键词计划
   const deleteKeywordPlan = async (id: string) => {
     if (!confirm('确定要删除这个关键词计划吗？')) return;
@@ -245,6 +332,10 @@ export default function KeywordPlansPage() {
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="w-4 h-4 mr-2" />
             下载模板
+          </Button>
+          <Button variant="outline" onClick={() => setShowAddForm(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            添加关键词
           </Button>
           <Button onClick={() => setShowImportForm(true)}>
             <Upload className="w-4 h-4 mr-2" />
@@ -329,6 +420,134 @@ export default function KeywordPlansPage() {
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* 手动添加表单 */}
+      {showAddForm && (
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">添加关键词</h2>
+          <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  选择网站 *
+                </label>
+                <select
+                  value={addForm.websiteId}
+                  onChange={(e) => {
+                    setAddForm(prev => ({ ...prev, websiteId: e.target.value, categoryId: '' }));
+                    if (e.target.value) {
+                      fetchCategoriesByWebsite(e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">请选择网站</option>
+                  {websites.map((website) => (
+                    <option key={website.id} value={website.id}>
+                      {website.name} ({website.domain})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  选择分类 *
+                </label>
+                <select
+                  value={addForm.categoryId}
+                  onChange={(e) => setAddForm(prev => ({ ...prev, categoryId: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!addForm.websiteId}
+                >
+                  <option value="">请选择分类</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                关键词 *
+              </label>
+              <Input
+                placeholder="请输入关键词"
+                value={addForm.keyword}
+                onChange={(e) => setAddForm(prev => ({ ...prev, keyword: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  搜索量
+                </label>
+                <Input
+                  type="number"
+                  placeholder="月搜索量"
+                  value={addForm.searchVolume}
+                  onChange={(e) => setAddForm(prev => ({ ...prev, searchVolume: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  难度 (0-100)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="SEO难度"
+                  value={addForm.difficulty}
+                  onChange={(e) => setAddForm(prev => ({ ...prev, difficulty: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  竞争程度
+                </label>
+                <select
+                  value={addForm.competition}
+                  onChange={(e) => setAddForm(prev => ({ ...prev, competition: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  优先级 (1-5)
+                </label>
+                <select
+                  value={addForm.priority}
+                  onChange={(e) => setAddForm(prev => ({ ...prev, priority: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="1">1 (最高)</option>
+                  <option value="2">2 (高)</option>
+                  <option value="3">3 (中)</option>
+                  <option value="4">4 (低)</option>
+                  <option value="5">5 (最低)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleAddKeyword} disabled={adding}>
+                {adding ? '添加中...' : '添加关键词'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
+                取消
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -433,7 +652,7 @@ export default function KeywordPlansPage() {
                     <div className="text-sm text-gray-900">
                       <div className="flex items-center">
                         <BarChart3 className="w-4 h-4 text-blue-500 mr-1" />
-                        搜索量: {plan.searchVolume.toLocaleString()}
+                        搜索量: {plan.searchVolume?.toLocaleString()}
                       </div>
                       <div className="text-gray-500">
                         难度: {plan.difficulty}/100

@@ -98,6 +98,40 @@ export default function GenerationTasksPage() {
     }
   };
 
+  // 测试文章生成
+  const testArticleGeneration = async () => {
+    const keyword = prompt('请输入测试关键词（英文）:', 'youtube to mp3 converter');
+    if (!keyword) return;
+
+    try {
+      const response = await fetch('/api/generation-tasks/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          keyword,
+          websiteInfo: {
+            name: 'YoutubeToMp3',
+            domain: 'youtubetomp3.art',
+            description: 'Free online YouTube to MP3 converter tool'
+          }
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`✅ 文章生成测试成功！\n标题: ${data.data.title}\nSEO标题: ${data.data.seoTitle}\n内容长度: ${data.data.contentLength} 字符\nTokens使用: ${data.data.tokensUsed}\n\n内容预览:\n${data.data.contentPreview}`);
+      } else {
+        alert(`❌ 文章生成测试失败：${data.message}`);
+      }
+    } catch (error) {
+      console.error('测试文章生成失败:', error);
+      alert('测试失败');
+    }
+  };
+
   // 手动触发生成任务
   const triggerGeneration = async () => {
     if (!confirm('确定要手动触发文章生成任务吗？')) return;
@@ -211,6 +245,10 @@ export default function GenerationTasksPage() {
           <Button variant="outline" onClick={testAIConnection}>
             <CheckCircle className="w-4 h-4 mr-2" />
             测试AI
+          </Button>
+          <Button variant="outline" onClick={testArticleGeneration}>
+            <Eye className="w-4 h-4 mr-2" />
+            测试生成
           </Button>
           <Button variant="outline" onClick={fetchTasks}>
             <RefreshCw className="w-4 h-4 mr-2" />

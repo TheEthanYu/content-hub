@@ -94,7 +94,11 @@ export async function POST(request: NextRequest) {
             await db.update(keywordPlans).set({ status: 'processing' }).where(eq(keywordPlans.id, keywordPlan.id))
 
             // 5. 调用AI生成文章内容
-            const aiResponse = await generateArticleWithAI(keywordPlan.keyword, keywordPlan.searchVolume || undefined, keywordPlan.difficulty || undefined, keywordPlan.competition || undefined)
+            const aiResponse = await generateArticleWithAI(keywordPlan.keyword, keywordPlan.searchVolume || undefined, keywordPlan.difficulty || undefined, keywordPlan.competition || undefined, {
+              name: website.name,
+              domain: website.domain,
+              description: website.description || undefined
+            })
 
             if (aiResponse.success && aiResponse.data) {
               // 6. 创建文章记录

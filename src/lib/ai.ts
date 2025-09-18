@@ -22,14 +22,24 @@ const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrout
 /**
  * 使用OpenRouter生成文章内容
  */
-export async function generateArticleWithAI(keyword: string, searchVolume?: number, difficulty?: number, competition?: string): Promise<AIResponse> {
+export async function generateArticleWithAI(
+  keyword: string,
+  searchVolume?: number,
+  difficulty?: number,
+  competition?: string,
+  websiteInfo?: {
+    name: string
+    domain: string
+    description?: string
+  }
+): Promise<AIResponse> {
   try {
     if (!OPENROUTER_API_KEY) {
       throw new Error('OpenRouter API密钥未配置')
     }
 
     // 构建提示词
-    const prompt = buildPrompt(keyword, searchVolume, difficulty, competition)
+    const prompt = buildPrompt(keyword, searchVolume, difficulty, competition, websiteInfo)
 
     console.log(`开始为关键词 "${keyword}" 生成文章...`)
 
@@ -103,39 +113,86 @@ export async function generateArticleWithAI(keyword: string, searchVolume?: numb
 /**
  * 构建AI提示词
  */
-function buildPrompt(keyword: string, searchVolume?: number, difficulty?: number, competition?: string): string {
+function buildPrompt(
+  keyword: string,
+  searchVolume?: number,
+  difficulty?: number,
+  competition?: string,
+  websiteInfo?: {
+    name: string
+    domain: string
+    description?: string
+  }
+): string {
   const seoData = searchVolume
-    ? `\n关键词SEO数据：
-- 搜索量：${searchVolume?.toLocaleString()}
-- 难度：${difficulty}/100
-- 竞争程度：${competition || '未知'}`
+    ? `\nKeyword SEO Data:
+- Search Volume: ${searchVolume?.toLocaleString()}/month
+- Difficulty: ${difficulty}/100
+- Competition: ${competition || 'Unknown'}`
     : ''
 
-  return `你是一个专业的SEO内容创作者。请根据以下关键词创作一篇高质量的SEO文章。
+  const websiteSection = websiteInfo
+    ? `\nWebsite Information:
+- Website Name: ${websiteInfo.name}
+- Domain: ${websiteInfo.domain}
+- Description: ${websiteInfo.description || 'A helpful online tool'}
 
-目标关键词："${keyword}"${seoData}
+Please naturally recommend or mention this website as a solution when relevant to the topic. Include the website name and emphasize its benefits to users.`
+    : ''
 
-请严格按照以下JSON格式返回内容：
+  return `You are a professional SEO content writer with expertise in creating high-quality, EEAT-optimized articles. Create a comprehensive article targeting the following keyword.
+
+Target Keyword: "${keyword}"${seoData}${websiteSection}
+
+Return the content in the following JSON format:
 
 \`\`\`json
 {
-  "title": "文章标题（包含关键词，吸引人且SEO友好）",
-  "content": "完整的文章内容（Markdown格式，2000-3000字，结构清晰，包含小标题、列表等元素，自然融入关键词3-5次）",
-  "seoTitle": "SEO标题（50-60个字符，包含关键词）",
-  "seoDescription": "SEO描述（150-160个字符，吸引人点击）"
+  "title": "Article title (engaging, SEO-friendly, includes target keyword)",
+  "content": "Complete article content in Markdown format (2500-4000 words)",
+  "seoTitle": "SEO title (50-60 characters, includes target keyword)",
+  "seoDescription": "Meta description (150-160 characters, compelling click-through)"
 }
 \`\`\`
 
-要求：
-1. 文章要有实用价值，提供真实有用的信息
-2. 结构清晰：引言 → 主要内容（2-4个小节） → 结论
-3. 自然融入关键词，避免关键词堆砌
-4. 使用Markdown格式：标题用##，小标题用###，重要内容用**粗体**
-5. 包含有序或无序列表来提高可读性
-6. 语言流畅，符合中文表达习惯
-7. 内容要求原创，避免常见的模板化内容
+CONTENT REQUIREMENTS:
 
-请确保返回的是有效的JSON格式，不要包含任何其他文字。`
+**EEAT Optimization:**
+1. **Experience**: Write from a knowledgeable perspective, include practical tips and real-world applications
+2. **Expertise**: Demonstrate deep subject knowledge, use technical accuracy, cite best practices
+3. **Authoritativeness**: Structure content professionally, use confident language, provide comprehensive coverage
+4. **Trustworthiness**: Include disclaimers when appropriate, acknowledge limitations, provide balanced viewpoints
+
+**SEO Optimization:**
+1. Use target keyword naturally 4-6 times throughout the article
+2. Include semantic keywords and related terms
+3. Structure with proper heading hierarchy (##, ###, ####)
+4. Include bulleted and numbered lists for readability
+5. Write compelling meta descriptions that encourage clicks
+6. Use internal linking opportunities (mention related topics)
+
+**Content Structure:**
+1. **Introduction** (150-200 words): Hook, keyword mention, article overview
+2. **Main Content** (2000-3000 words): 4-6 detailed sections with practical information
+3. **FAQ Section** (300-500 words): Address common questions with schema-friendly format
+4. **Conclusion** (150-200 words): Summarize key points, include call-to-action
+
+**Writing Style:**
+- Write in English with clear, accessible language
+- Use active voice and engaging tone
+- Include practical examples and actionable advice
+- Format with proper Markdown syntax
+- Bold important terms and concepts
+- Create scannable content with subheadings and lists
+
+**Quality Standards:**
+- Original, unique content (no templated phrases)
+- Factually accurate and up-to-date information
+- Comprehensive coverage of the topic
+- User-focused with clear value proposition
+- Professional tone suitable for target audience
+
+Return only valid JSON format without any additional text.`
 }
 
 /**

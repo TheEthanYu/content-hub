@@ -99,8 +99,72 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { websiteId, categoryId, keywords, importSource = 'manual', priority = 1 } = body
+    const { websiteId, categoryId, keyword, keywords, searchVolume, difficulty, competition, priority = 1, status = 'pending', importSource = 'manual' } = body
 
+    // 支持单个关键词添加或批量导入
+    if (keyword) {
+      // 单个关键词添加
+      if (!websiteId || !keyword.trim()) {
+        return NextResponse.json({ success: false, message: '网站ID和关键词不能为空' }, { status: 400 })
+      }
+
+      // 验证网站是否存在
+      const website = await db.select({ id: websites.id }).from(websites).where(eq(websites.id, websiteId)).limit(1)
+      if (website.length === 0) {
+        return NextResponse.json({ success: false, message: '网站不存在' }, { status: 400 })
+      }
+
+      // 如果指定了分类，验证分类是否存在且属于该网站
+      if (categoryId) {
+        const category = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(and(eq(categories.id, categoryId), eq(categories.websiteId, websiteId)))
+          .limit(1)
+        if (category.length === 0) {
+          return NextResponse.json({ success: false, message: '分类不存在或不属于该网站' }, { status: 400 })
+        }
+      }
+
+      const normalizedKeyword = normalizeKeyword(keyword)
+      if (!normalizedKeyword) {
+        return NextResponse.json({ success: false, message: '关键词格式无效' }, { status: 400 })
+      }
+
+      const keywordHash = generateKeywordHash(keyword, websiteId)
+
+      // 检查是否已存在
+      const existing = await db.select({ id: keywordPlans.id }).from(keywordPlans).where(eq(keywordPlans.keywordHash, keywordHash)).limit(1)
+      if (existing.length > 0) {
+        return NextResponse.json({ success: false, message: '该关键词已存在' }, { status: 400 })
+      }
+
+      // 创建关键词计划
+      const [newKeywordPlan] = await db
+        .insert(keywordPlans)
+        .values({
+          keyword: normalizedKeyword,
+          keywordHash,
+          websiteId,
+          categoryId: categoryId || null,
+          searchVolume: searchVolume || null,
+          difficulty: difficulty || null,
+          competition: competition || null,
+          priority: priority || 1,
+          status: status || 'pending',
+          importSource: 'manual',
+          importBatch: `manual-${Date.now()}`
+        })
+        .returning()
+
+      return NextResponse.json({
+        success: true,
+        message: '关键词添加成功',
+        data: newKeywordPlan
+      })
+    }
+
+    // 批量导入逻辑
     if (!websiteId || !keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return NextResponse.json({ success: false, message: '网站ID和关键词列表不能为空' }, { status: 400 })
     }

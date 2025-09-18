@@ -7,6 +7,12 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { formatDate } from '@/lib/utils';
 
+interface Website {
+  id: string;
+  name: string;
+  domain: string;
+}
+
 interface Category {
   id: string;
   name: string;
@@ -14,23 +20,36 @@ interface Category {
   description: string | null;
   color: string;
   createdAt: string;
+  website?: {
+    id: string;
+    name: string;
+    domain: string;
+  };
 }
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [selectedWebsite, setSelectedWebsite] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     color: '#3B82F6',
+    websiteId: '',
   });
 
   // 获取分类列表
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/categories');
+      const params = new URLSearchParams();
+      if (selectedWebsite) {
+        params.append('websiteId', selectedWebsite);
+      }
+      
+      const response = await fetch(`/api/categories?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -40,6 +59,20 @@ export default function CategoriesPage() {
       console.error('获取分类列表失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 获取网站列表
+  const fetchWebsites = async () => {
+    try {
+      const response = await fetch('/api/websites');
+      const data = await response.json();
+      
+      if (data.success) {
+        setWebsites(data.data);
+      }
+    } catch (error) {
+      console.error('获取网站列表失败:', error);
     }
   };
 
@@ -101,6 +134,7 @@ export default function CategoriesPage() {
       name: category.name,
       description: category.description || '',
       color: category.color,
+      websiteId: category.website?.id || '',
     });
     setShowForm(true);
   };
@@ -111,14 +145,20 @@ export default function CategoriesPage() {
       name: '',
       description: '',
       color: '#3B82F6',
+      websiteId: '',
     });
     setEditingCategory(null);
     setShowForm(false);
   };
 
   useEffect(() => {
+    fetchWebsites();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [selectedWebsite]);
 
   if (loading) {
     return (
@@ -142,6 +182,29 @@ export default function CategoriesPage() {
         </Button>
       </div>
 
+      {/* 网站筛选 */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="flex items-center space-x-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              筛选网站
+            </label>
+            <select
+              value={selectedWebsite}
+              onChange={(e) => setSelectedWebsite(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">所有网站</option>
+              {websites.map((website) => (
+                <option key={website.id} value={website.id}>
+                  {website.name} ({website.domain})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* 创建/编辑表单 */}
       {showForm && (
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -149,7 +212,25 @@ export default function CategoriesPage() {
             {editingCategory ? '编辑分类' : '创建分类'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  选择网站 *
+                </label>
+                <select
+                  value={formData.websiteId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, websiteId: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">请选择网站</option>
+                  {websites.map((website) => (
+                    <option key={website.id} value={website.id}>
+                      {website.name} ({website.domain})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   分类名称 *
@@ -213,6 +294,9 @@ export default function CategoriesPage() {
                   分类名称
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  网站
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   描述
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -243,6 +327,14 @@ export default function CategoriesPage() {
                           {category.slug}
                         </div>
                       </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {category.website?.name || '未关联'}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {category.website?.domain || ''}
                     </div>
                   </td>
                   <td className="px-6 py-4">
