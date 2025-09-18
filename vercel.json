@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate-articles",
+      "schedule": "0 9 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cron/generate-articles/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}

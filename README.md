@@ -115,14 +115,79 @@ if (data.success) { console.log('文章列表:', data.data.articles); } \`\`\`
 
 \`\`\`bash pnpm build pnpm start \`\`\`
 
+## 🚀 自动生成功能
+
+### 关键词计划管理
+
+- **Excel 模板导入**: 下载模板，填入 SEMrush 数据，批量导入关键词
+- **智能去重**: 自动识别重复关键词，避免重复生成
+- **多网站隔离**: 不同网站的关键词完全隔离管理
+- **优先级管理**: 支持设置关键词优先级，优先生成重要内容
+
+### 自动文章生成
+
+- **定时任务**: 通过 Vercel Cron 定时执行生成任务
+- **AI 生成**: 基于关键词自动生成 SEO 友好的文章内容
+- **生成限制**: 每个网站可配置每日最大生成数量
+- **状态跟踪**: 完整的任务执行历史和状态监控
+
+### 环境变量配置
+
+```env
+# 基础配置
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+DATABASE_URL=postgresql://username:password@host:port/database
+
+# 定时任务安全
+CRON_SECRET=your-super-secret-cron-key
+
+# AI服务配置（可选）
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-3.5-turbo
+```
+
+### Vercel 部署
+
+1. **推送到 GitHub**
+2. **在 Vercel 导入项目**
+3. **设置环境变量**
+4. **部署完成后，定时任务自动生效**
+
+定时任务配置（每天上午 9 点执行）：
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/generate-articles",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
+```
+
+## 📊 管理页面
+
+- `/admin/websites` - 网站管理
+- `/admin/keyword-plans` - 关键词计划管理
+- `/admin/articles` - 文章管理
+- `/admin/categories` - 分类管理
+- `/admin/generation-tasks` - 生成任务历史
+
 ## 🛣️ 开发计划
 
-- [ ] 自动发布功能完善
+- [x] 多网站数据隔离
+- [x] 关键词计划管理
+- [x] Excel 模板导入
+- [x] 自动文章生成
+- [x] 定时任务支持
+- [ ] 真实 AI 服务集成
 - [ ] 图片上传和管理
 - [ ] 文章版本控制
 - [ ] 更多 SEO 工具
 - [ ] 数据分析面板
-- [ ] 多语言支持
 
 ## 📄 许可证
 
