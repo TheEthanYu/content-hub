@@ -143,9 +143,10 @@ DATABASE_URL=postgresql://username:password@host:port/database
 # 定时任务安全
 CRON_SECRET=your-super-secret-cron-key
 
-# AI服务配置（可选）
-OPENAI_API_KEY=your-openai-api-key
-OPENAI_MODEL=gpt-3.5-turbo
+# AI服务配置（OpenRouter）
+OPENROUTER_API_KEY=your-openrouter-api-key
+OPENROUTER_MODEL=anthropic/claude-3-haiku
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 ```
 
 ### Vercel 部署
@@ -176,6 +177,32 @@ OPENAI_MODEL=gpt-3.5-turbo
 - `/admin/categories` - 分类管理
 - `/admin/generation-tasks` - 生成任务历史
 
+## 📖 使用指南
+
+### 1. 初始设置
+
+1. **配置环境变量**: 创建 `.env` 文件并填入相应配置
+2. **设置数据库**: 运行 `pnpm db:push` 推送数据库结构
+3. **添加网站**: 在 `/admin/websites` 页面添加要管理的网站
+
+### 2. 关键词计划
+
+1. **下载模板**: 在 `/admin/keyword-plans` 页面下载 Excel 模板
+2. **导入关键词**: 填入 SEMrush 数据后导入系统
+3. **自动去重**: 系统会自动对重复关键词进行去重处理
+
+### 3. AI 文章生成
+
+1. **测试 AI 连接**: 点击"测试 AI"按钮确认 OpenRouter 配置正确
+2. **配置网站**: 在网站设置中启用自动生成并设置每日限额
+3. **定时执行**: Vercel 会每天自动触发文章生成任务
+
+### 4. 内容管理
+
+- **查看任务**: 在 `/admin/generation-tasks` 查看生成历史
+- **编辑文章**: 在 `/admin/articles` 管理所有文章
+- **API 调用**: 其他网站通过公开 API 获取文章内容
+
 ## 🛣️ 开发计划
 
 - [x] 多网站数据隔离
@@ -183,7 +210,7 @@ OPENAI_MODEL=gpt-3.5-turbo
 - [x] Excel 模板导入
 - [x] 自动文章生成
 - [x] 定时任务支持
-- [ ] 真实 AI 服务集成
+- [x] OpenRouter AI 服务集成
 - [ ] 图片上传和管理
 - [ ] 文章版本控制
 - [ ] 更多 SEO 工具

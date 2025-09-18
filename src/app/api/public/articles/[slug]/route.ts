@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     await db
       .update(articles)
       .set({
-        viewCount: articleData[0].viewCount + 1,
+        viewCount: (articleData[0].viewCount || 0) + 1,
         updatedAt: new Date()
       })
       .where(eq(articles.id, articleData[0].id))
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       success: true,
       data: {
         ...articleData[0],
-        viewCount: articleData[0].viewCount + 1
+        viewCount: (articleData[0].viewCount || 0) + 1
       }
     })
   } catch (error) {

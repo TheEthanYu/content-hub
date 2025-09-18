@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, articles, categories } from '@/lib/db'
-import { desc, eq, like, or } from 'drizzle-orm'
+import { desc, eq, like, or, and } from 'drizzle-orm'
 import { generateSlug, extractExcerpt } from '@/lib/utils'
 
 // 获取文章列表
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       })
       .from(articles)
       .leftJoin(categories, eq(articles.categoryId, categories.id))
-      .where(whereConditions.length > 0 ? whereConditions.reduce((a, b) => eq(a, b)) : undefined)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(articles.createdAt))
       .limit(limit)
       .offset(offset)
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     const totalQuery = await db
       .select({ count: articles.id })
       .from(articles)
-      .where(whereConditions.length > 0 ? whereConditions.reduce((a, b) => eq(a, b)) : undefined)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
 
     const total = totalQuery.length
 

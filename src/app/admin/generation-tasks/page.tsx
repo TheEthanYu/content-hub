@@ -81,6 +81,23 @@ export default function GenerationTasksPage() {
     }
   };
 
+  // 测试AI连接
+  const testAIConnection = async () => {
+    try {
+      const response = await fetch('/api/ai/test');
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`✅ AI连接测试成功！\n当前模型: ${data.data.currentModel}\n可用模型数量: ${data.data.totalModels}`);
+      } else {
+        alert(`❌ AI连接测试失败：${data.message}`);
+      }
+    } catch (error) {
+      console.error('测试AI连接失败:', error);
+      alert('测试失败');
+    }
+  };
+
   // 手动触发生成任务
   const triggerGeneration = async () => {
     if (!confirm('确定要手动触发文章生成任务吗？')) return;
@@ -191,6 +208,10 @@ export default function GenerationTasksPage() {
           <p className="text-gray-600 mt-2">查看文章自动生成任务的执行历史</p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={testAIConnection}>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            测试AI
+          </Button>
           <Button variant="outline" onClick={fetchTasks}>
             <RefreshCw className="w-4 h-4 mr-2" />
             刷新

@@ -9,12 +9,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const websiteId = searchParams.get('websiteId')
 
-    let query = db.select().from(categories).orderBy(desc(categories.createdAt))
-
     // 如果指定了网站ID，只返回该网站的分类
-    if (websiteId) {
-      query = db.select().from(categories).where(eq(categories.websiteId, websiteId)).orderBy(desc(categories.createdAt))
-    }
+    const query = websiteId ? db.select().from(categories).where(eq(categories.websiteId, websiteId)).orderBy(desc(categories.createdAt)) : db.select().from(categories).orderBy(desc(categories.createdAt))
 
     const categoriesData = await query
 

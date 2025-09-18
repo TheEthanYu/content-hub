@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, websites, keywordPlans, articles, generationTasks } from '@/lib/db'
-import { eq, and, lte, isNull, or } from 'drizzle-orm'
+import { eq, and, lte, gte, isNull, or, count, desc, asc } from 'drizzle-orm'
 import { generateSlug, extractExcerpt } from '@/lib/utils'
+import { generateArticleWithAI } from '@/lib/ai'
 
 // Vercel Cron Job 端点 - 自动生成文章
 export async function POST(request: NextRequest) {
@@ -46,24 +47,25 @@ export async function POST(request: NextRequest) {
         tomorrow.setDate(tomorrow.getDate() + 1)
 
         const todayGeneratedCount = await db
-          .select({ count: generationTasks.id })
+          .select({ count: count(generationTasks.id) })
           .from(generationTasks)
-          .where(and(eq(generationTasks.websiteId, website.id), eq(generationTasks.status, 'completed'), lte(generationTasks.completedAt, tomorrow.toISOString()), lte(today.toISOString(), generationTasks.completedAt)))
+          .where(and(eq(generationTasks.websiteId, website.id), eq(generationTasks.status, 'completed'), gte(generationTasks.completedAt, today), lte(generationTasks.completedAt, tomorrow)))
 
-        const generatedToday = todayGeneratedCount.length
+        const generatedToday = todayGeneratedCount[0]?.count || 0
 
-        if (generatedToday >= website.maxArticlesPerDay) {
-          console.log(`网站 ${website.name} 今日已达到最大生成数量 (${generatedToday}/${website.maxArticlesPerDay})`)
+        const maxArticlesPerDay = website.maxArticlesPerDay || 5 // 默认值
+        if (generatedToday >= maxArticlesPerDay) {
+          console.log(`网站 ${website.name} 今日已达到最大生成数量 (${generatedToday}/${maxArticlesPerDay})`)
           continue
         }
 
         // 3. 获取待生成的关键词（优先级高的优先）
-        const remainingSlots = website.maxArticlesPerDay - generatedToday
+        const remainingSlots = maxArticlesPerDay - generatedToday
         const pendingKeywords = await db
           .select()
           .from(keywordPlans)
           .where(and(eq(keywordPlans.websiteId, website.id), eq(keywordPlans.status, 'pending'), isNull(keywordPlans.articleId)))
-          .orderBy(keywordPlans.priority, keywordPlans.createdAt)
+          .orderBy(desc(keywordPlans.priority), asc(keywordPlans.createdAt))
           .limit(remainingSlots)
 
         console.log(`网站 ${website.name} 找到 ${pendingKeywords.length} 个待生成关键词`)
@@ -92,24 +94,24 @@ export async function POST(request: NextRequest) {
             await db.update(keywordPlans).set({ status: 'processing' }).where(eq(keywordPlans.id, keywordPlan.id))
 
             // 5. 调用AI生成文章内容
-            const generatedContent = await generateArticleContent(keywordPlan.keyword, keywordPlan)
+            const aiResponse = await generateArticleWithAI(keywordPlan.keyword, keywordPlan.searchVolume || undefined, keywordPlan.difficulty || undefined, keywordPlan.competition || undefined)
 
-            if (generatedContent.success) {
+            if (aiResponse.success && aiResponse.data) {
               // 6. 创建文章记录
-              const slug = generateSlug(generatedContent.title)
-              const excerpt = extractExcerpt(generatedContent.content)
+              const slug = generateSlug(aiResponse.data.title)
+              const excerpt = extractExcerpt(aiResponse.data.content)
 
               const [newArticle] = await db
                 .insert(articles)
                 .values({
-                  title: generatedContent.title,
+                  title: aiResponse.data.title,
                   slug,
-                  content: generatedContent.content,
+                  content: aiResponse.data.content,
                   excerpt,
                   categoryId: keywordPlan.categoryId,
                   status: 'published', // 自动发布
-                  seoTitle: generatedContent.seoTitle || generatedContent.title,
-                  seoDescription: generatedContent.seoDescription || excerpt,
+                  seoTitle: aiResponse.data.seoTitle,
+                  seoDescription: aiResponse.data.seoDescription,
                   seoKeywords: keywordPlan.keyword,
                   publishedAt: new Date()
                 })
@@ -131,14 +133,14 @@ export async function POST(request: NextRequest) {
                   .set({
                     status: 'completed',
                     articleId: newArticle.id,
-                    tokensUsed: generatedContent.tokensUsed || 0,
+                    tokensUsed: aiResponse.data.tokensUsed,
                     completedAt: new Date()
                   })
                   .where(eq(generationTasks.id, task.id))
               ])
 
               totalGenerated++
-              console.log(`✅ 成功生成文章: ${generatedContent.title}`)
+              console.log(`✅ 成功生成文章: ${aiResponse.data.title}`)
             } else {
               // 生成失败，更新状态
               await Promise.all([
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
                   .update(keywordPlans)
                   .set({
                     status: 'failed',
-                    failureReason: generatedContent.error
+                    failureReason: aiResponse.error || '未知错误'
                   })
                   .where(eq(keywordPlans.id, keywordPlan.id)),
 
@@ -154,13 +156,13 @@ export async function POST(request: NextRequest) {
                   .update(generationTasks)
                   .set({
                     status: 'failed',
-                    errorMessage: generatedContent.error,
+                    errorMessage: aiResponse.error || '未知错误',
                     completedAt: new Date()
                   })
                   .where(eq(generationTasks.id, task.id))
               ])
 
-              console.log(`❌ 生成失败: ${keywordPlan.keyword} - ${generatedContent.error}`)
+              console.log(`❌ 生成失败: ${keywordPlan.keyword} - ${aiResponse.error}`)
             }
           } catch (error) {
             console.error(`处理关键词 "${keywordPlan.keyword}" 时出错:`, error)
@@ -211,79 +213,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
-  }
-}
-
-// AI文章生成函数（模拟）
-async function generateArticleContent(keyword: string, keywordPlan: any) {
-  try {
-    // 这里你可以集成真实的AI服务，比如OpenAI GPT
-    // 现在先返回模拟内容
-
-    // 模拟AI调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    // 模拟生成的文章内容
-    const title = `${keyword} - 完整指南与最佳实践`
-    const content = `# ${title}
-
-## 引言
-
-在当今数字化时代，了解"${keyword}"变得越来越重要。本文将为您提供关于${keyword}的全面指南，帮助您掌握相关知识和技能。
-
-## 什么是${keyword}？
-
-${keyword}是一个重要的概念，它在现代生活中扮演着关键角色。通过深入了解${keyword}，您可以更好地应用这些知识来改善您的工作和生活。
-
-## ${keyword}的重要性
-
-1. **提高效率**: 正确理解${keyword}可以显著提高工作效率
-2. **降低成本**: 合理运用${keyword}有助于控制成本
-3. **增强竞争力**: 掌握${keyword}相关技能可以提升个人或企业竞争力
-
-## 实施${keyword}的最佳实践
-
-### 1. 制定明确的目标
-在开始实施${keyword}之前，确保您有明确的目标和期望结果。
-
-### 2. 选择合适的工具
-市场上有许多与${keyword}相关的工具，选择最适合您需求的工具非常重要。
-
-### 3. 持续学习和改进
-${keyword}是一个不断发展的领域，保持学习和更新知识至关重要。
-
-## 常见问题解答
-
-**Q: 如何开始学习${keyword}？**
-A: 建议从基础概念开始，逐步深入学习更高级的主题。
-
-**Q: ${keyword}需要什么技能？**
-A: 具体技能要求取决于应用领域，但基本的分析和问题解决能力是必需的。
-
-## 结论
-
-${keyword}是一个值得深入学习的重要主题。通过本文的介绍，希望您对${keyword}有了更清晰的认识。记住，实践是掌握${keyword}的最佳方式。
-
----
-
-*本文由AI自动生成，内容仅供参考。*`
-
-    const seoTitle = `${keyword} - 2024年最新指南`
-    const seoDescription = `了解${keyword}的完整指南，包括最佳实践、实施步骤和常见问题解答。提升您的${keyword}技能。`
-
-    return {
-      success: true,
-      title,
-      content,
-      seoTitle,
-      seoDescription,
-      tokensUsed: 1500 // 模拟token使用量
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '生成失败'
-    }
   }
 }
 
