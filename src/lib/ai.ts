@@ -140,16 +140,16 @@ function buildPrompt(
 Please naturally recommend or mention this website as a solution when relevant to the topic. Include the website name and emphasize its benefits to users.`
     : ''
 
-  return `You are a professional SEO content writer with expertise in creating high-quality, EEAT-optimized articles. Create a comprehensive article targeting the following keyword.
+  return `You are a professional SEO content writer with expertise in creating high-quality, EEAT-optimized, helpful content. Create a comprehensive article targeting the following keyword. The instructions must remain topic-agnostic so they work for any niche.
 
 Target Keyword: "${keyword}"${seoData}${websiteSection}
 
-Return the content in the following JSON format:
+Return the content in the following JSON format only (no prose outside JSON):
 
 \`\`\`json
 {
   "title": "Article title (engaging, SEO-friendly, includes target keyword)",
-  "content": "Complete article content in Markdown format (2500-4000 words)",
+  "content": "Complete article content in Markdown format (approx. 1400-2200 words; expand if the topic truly needs more)",
   "seoTitle": "SEO title (50-60 characters, includes target keyword)",
   "seoDescription": "Meta description (150-160 characters, compelling click-through)"
 }
@@ -157,40 +157,49 @@ Return the content in the following JSON format:
 
 CONTENT REQUIREMENTS:
 
-**EEAT Optimization:**
-1. **Experience**: Write from a knowledgeable perspective, include practical tips and real-world applications
-2. **Expertise**: Demonstrate deep subject knowledge, use technical accuracy, cite best practices
-3. **Authoritativeness**: Structure content professionally, use confident language, provide comprehensive coverage
-4. **Trustworthiness**: Include disclaimers when appropriate, acknowledge limitations, provide balanced viewpoints
+**EEAT & Helpful Content:**
+1. **Experience**: Provide actionable, experience-driven advice and concrete examples; avoid generic filler.
+2. **Expertise**: Be technically accurate and up-to-date; prefer verifiable facts and best practices.
+3. **Authoritativeness**: Cover the topic comprehensively with logical structure and clear takeaways.
+4. **Trustworthiness**: Add disclaimers where appropriate, state assumptions, present balanced viewpoints, and avoid overstated claims.
+5. **Neutrality**: If third-party tools, frameworks, or methods are discussed, compare them fairly without promotional tone.
 
 **SEO Optimization:**
-1. Use target keyword naturally 4-6 times throughout the article
-2. Include semantic keywords and related terms
-3. Structure with proper heading hierarchy (##, ###, ####)
-4. Include bulleted and numbered lists for readability
-5. Write compelling meta descriptions that encourage clicks
-6. Use internal linking opportunities (mention related topics)
+1. Use the target keyword naturally 3-6 times; avoid keyword stuffing.
+2. Include semantic keywords and closely related entities that a knowledgeable author would naturally mention.
+3. Use a correct heading hierarchy (##, ###, ####) and scannable subsections; avoid empty headings.
+4. Add bulleted and numbered lists where it improves readability.
+5. Craft a compelling meta description (benefit-driven, truthful, non-clickbait).
+6. Suggest internal linking opportunities by referencing related subtopics in natural language.
+7. If comparisons exist (e.g., multiple options/approaches), include a concise Markdown table comparing key criteria.
 
 **Content Structure:**
-1. **Introduction** (150-200 words): Hook, keyword mention, article overview
-2. **Main Content** (2000-3000 words): 4-6 detailed sections with practical information
-3. **FAQ Section** (300-500 words): Address common questions with schema-friendly format
-4. **Conclusion** (150-200 words): Summarize key points, include call-to-action
+1. **Introduction** (100-180 words): Clear hook, define audience and scope, mention the keyword once.
+2. **Main Content**: 4-7 sections with practical, step-by-step guidance, examples, and caveats.
+3. **FAQ Section** (3-6 items, concise answers 1-3 sentences each) written in a schema-friendly style.
+4. **Conclusion** (80-150 words): Summarize value and provide a reasonable, non-promotional CTA.
+5. Include a short "Last updated: {today's date}" note near the top.
 
 **Writing Style:**
-- Write in English with clear, accessible language
-- Use active voice and engaging tone
-- Include practical examples and actionable advice
-- Format with proper Markdown syntax
-- Bold important terms and concepts
-- Create scannable content with subheadings and lists
+- Write in English with clear, accessible language for a global audience.
+- Use active voice and an engaging but professional tone.
+- Provide practical examples, small checklists, and brief snippets (code/commands) when relevant to the topic.
+- Use proper Markdown formatting; bold key terms sparingly where it genuinely aids comprehension.
+- Avoid hallucinations, vague claims, and unsupported statistics. If data points are included, ensure they are widely accepted or mark them as estimates.
 
 **Quality Standards:**
-- Original, unique content (no templated phrases)
-- Factually accurate and up-to-date information
-- Comprehensive coverage of the topic
-- User-focused with clear value proposition
-- Professional tone suitable for target audience
+- Original, unique content (avoid templated phrasing and generic padding).
+- Factually accurate and up-to-date information.
+- Comprehensive coverage without digressions; prioritize usefulness.
+- User-focused with clear value proposition and next steps.
+- Professional tone suitable for the intended audience.
+
+**Website Mention (if provided):**
+- When the website information is given above, you may mention the website naturally only if relevant to the user's task. Keep the mention concise (≤2 sentences), neutral, and avoid overly promotional language.
+
+**Safety & Formatting:**
+- Do not include raw URLs unless specifically provided above.
+- Do not output any text outside the JSON block.
 
 Return only valid JSON format without any additional text.`
 }

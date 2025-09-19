@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, articles, categories } from '@/lib/db'
-import { desc, eq, and } from 'drizzle-orm'
+import { db, articles, categories, websites } from '@/lib/db'
+import { desc, eq, and, inArray } from 'drizzle-orm'
 
 // 公开的文章列表API（供其他网站调用）
 export async function GET(request: NextRequest) {
@@ -9,10 +9,30 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const categorySlug = searchParams.get('category')
+    const websiteDomain = searchParams.get('domain')
+    const websiteId = searchParams.get('websiteId')
 
     const offset = (page - 1) * limit
 
     let whereConditions = [eq(articles.status, 'published')]
+
+    // 按网站筛选
+    if (websiteDomain) {
+      const website = await db.select({ id: websites.id }).from(websites).where(eq(websites.domain, websiteDomain)).limit(1)
+      if (website.length > 0) {
+        const websiteCategories = await db.select({ id: categories.id }).from(categories).where(eq(categories.websiteId, website[0].id))
+        if (websiteCategories.length > 0) {
+          const categoryIds = websiteCategories.map(cat => cat.id)
+          whereConditions.push(inArray(articles.categoryId, categoryIds))
+        }
+      }
+    } else if (websiteId) {
+      const websiteCategories = await db.select({ id: categories.id }).from(categories).where(eq(categories.websiteId, websiteId))
+      if (websiteCategories.length > 0) {
+        const categoryIds = websiteCategories.map(cat => cat.id)
+        whereConditions.push(inArray(articles.categoryId, categoryIds))
+      }
+    }
 
     // 按分类筛选
     if (categorySlug) {
