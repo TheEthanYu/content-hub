@@ -49,6 +49,14 @@ export default function KeywordPlansPage() {
   const [showImportForm, setShowImportForm] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0
+  });
+  
   // 筛选状态
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWebsite, setSelectedWebsite] = useState('');
@@ -62,6 +70,7 @@ export default function KeywordPlansPage() {
     content: '',
     importSource: 'excel'
   });
+  const [importing, setImporting] = useState(false);
 
   // 手动添加表单状态
   const [addForm, setAddForm] = useState({
@@ -76,9 +85,11 @@ export default function KeywordPlansPage() {
   const [adding, setAdding] = useState(false);
 
   // 获取关键词计划列表
-  const fetchKeywordPlans = async () => {
+  const fetchKeywordPlans = async (page = pagination.page) => {
     try {
       const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', pagination.limit.toString());
       if (searchTerm) params.append('search', searchTerm);
       if (selectedWebsite) params.append('websiteId', selectedWebsite);
       if (selectedCategory) params.append('categoryId', selectedCategory);
@@ -89,6 +100,7 @@ export default function KeywordPlansPage() {
       
       if (data.success) {
         setKeywordPlans(data.data.keywordPlans);
+        setPagination(data.data.pagination);
       }
     } catch (error) {
       console.error('获取关键词计划列表失败:', error);
@@ -182,6 +194,7 @@ export default function KeywordPlansPage() {
     }
 
     try {
+      setImporting(true);
       const response = await fetch('/api/keyword-plans', {
         method: 'PUT',
         headers: {
@@ -201,13 +214,15 @@ export default function KeywordPlansPage() {
           content: '',
           importSource: 'excel'
         });
-        fetchKeywordPlans();
+        fetchKeywordPlans(1); // 导入成功后回到第一页
       } else {
         alert(data.message || '导入失败');
       }
     } catch (error) {
       console.error('导入关键词失败:', error);
       alert('导入失败');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -259,7 +274,7 @@ export default function KeywordPlansPage() {
           competition: 'medium',
           priority: '1'
         });
-        fetchKeywordPlans();
+        fetchKeywordPlans(1); // 添加成功后回到第一页
       } else {
         alert(data.message || '添加失败');
       }
@@ -282,7 +297,7 @@ export default function KeywordPlansPage() {
       const data = await response.json();
       
       if (data.success) {
-        fetchKeywordPlans();
+        fetchKeywordPlans(); // 删除后刷新当前页
       } else {
         alert(data.message || '删除失败');
       }
@@ -293,7 +308,7 @@ export default function KeywordPlansPage() {
   };
 
   useEffect(() => {
-    Promise.all([fetchKeywordPlans(), fetchWebsites()]).finally(() => {
+    Promise.all([fetchKeywordPlans(1), fetchWebsites()]).finally(() => {
       setLoading(false);
     });
   }, [searchTerm, selectedWebsite, selectedCategory, selectedStatus]);
@@ -412,10 +427,10 @@ export default function KeywordPlansPage() {
             </div>
 
             <div className="flex items-center space-x-2">
-              <Button type="submit">
-                导入关键词
+              <Button type="submit" disabled={importing}>
+                {importing ? '导入中...' : '导入关键词'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setShowImportForm(false)}>
+              <Button type="button" variant="outline" onClick={() => setShowImportForm(false)} disabled={importing}>
                 取消
               </Button>
             </div>
@@ -730,6 +745,89 @@ export default function KeywordPlansPage() {
           </div>
         )}
       </div>
+
+      {/* 分页组件 */}
+      {pagination.totalPages > 1 && (
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-b-lg">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <Button
+              variant="outline"
+              onClick={() => fetchKeywordPlans(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+            >
+              上一页
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => fetchKeywordPlans(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages}
+            >
+              下一页
+            </Button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                显示第 <span className="font-medium">{(pagination.page - 1) * pagination.limit + 1}</span> 到{' '}
+                <span className="font-medium">
+                  {Math.min(pagination.page * pagination.limit, pagination.total)}
+                </span>{' '}
+                条，共 <span className="font-medium">{pagination.total}</span> 条结果
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="分页">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchKeywordPlans(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  上一页
+                </Button>
+                
+                {/* 页码按钮 */}
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pageNum === pagination.page ? "default" : "outline"}
+                      onClick={() => fetchKeywordPlans(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                        pageNum === pagination.page
+                          ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  onClick={() => fetchKeywordPlans(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                  下一页
+                </Button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

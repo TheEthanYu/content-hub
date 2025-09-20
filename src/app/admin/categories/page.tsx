@@ -20,11 +20,7 @@ interface Category {
   description: string | null;
   color: string;
   createdAt: string;
-  website?: {
-    id: string;
-    name: string;
-    domain: string;
-  };
+  websiteId: string;
 }
 
 export default function CategoriesPage() {
@@ -134,7 +130,7 @@ export default function CategoriesPage() {
       name: category.name,
       description: category.description || '',
       color: category.color,
-      websiteId: category.website?.id || '',
+      websiteId: category.websiteId || '',
     });
     setShowForm(true);
   };
@@ -330,12 +326,15 @@ export default function CategoriesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {category.website?.name || '未关联'}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {category.website?.domain || ''}
-                    </div>
+                    {(() => {
+                      const site = websites.find(w => w.id === category.websiteId);
+                      return (
+                        <>
+                          <div className="text-sm text-gray-900">{site?.name || '未关联'}</div>
+                          <div className="text-sm text-gray-500">{site?.domain || ''}</div>
+                        </>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-900">

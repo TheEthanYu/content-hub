@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, articles, categories } from '@/lib/db'
+import { publishLogs, generationTasks, keywordPlans } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { generateSlug, extractExcerpt } from '@/lib/utils'
 
@@ -103,16 +104,26 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 // 删除文章
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const [deletedArticle] = await db.delete(articles).where(eq(articles.id, params.id)).returning({ id: articles.id })
+    const deleted = await db.transaction(async tx => {
+      // 1) 删除发布日志
+      await tx.delete(publishLogs).where(eq(publishLogs.articleId, params.id))
 
-    if (!deletedArticle) {
+      // 2) 解除关键词计划与文章的关联（置空）
+      await tx.update(keywordPlans).set({ articleId: null }).where(eq(keywordPlans.articleId, params.id))
+
+      // 3) 删除关联的生成任务
+      await tx.delete(generationTasks).where(eq(generationTasks.articleId, params.id))
+
+      // 4) 删除文章本身
+      const [row] = await tx.delete(articles).where(eq(articles.id, params.id)).returning({ id: articles.id })
+      return row
+    })
+
+    if (!deleted) {
       return NextResponse.json({ success: false, message: '文章不存在' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      success: true,
-      message: '文章删除成功'
-    })
+    return NextResponse.json({ success: true, message: '文章删除成功' })
   } catch (error) {
     console.error('删除文章失败:', error)
     return NextResponse.json({ success: false, message: '删除文章失败' }, { status: 500 })
