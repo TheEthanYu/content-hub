@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       .select()
       .from(websites)
       .where(and(eq(websites.isActive, true), eq(websites.autoGenerateEnabled, true)))
+      .orderBy(asc(websites.createdAt)) // 按创建时间排序，确保轮转顺序一致
 
     if (activeWebsites.length === 0) {
       return NextResponse.json({
@@ -31,47 +32,66 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // 2. 轮转逻辑：根据当前时间计算应该处理哪个网站
+    const now = new Date()
+    const minutesSinceHour = now.getMinutes()
+    const websiteIndex = Math.floor(minutesSinceHour / 30) % activeWebsites.length
+    const currentWebsite = activeWebsites[websiteIndex]
+
+    console.log(`轮转选择网站: ${currentWebsite.name} (${currentWebsite.domain}) - 索引: ${websiteIndex}/${activeWebsites.length}`)
+
     let totalProcessed = 0
     let totalGenerated = 0
     const results = []
 
-    // 2. 为每个网站处理关键词
-    for (const website of activeWebsites) {
-      try {
-        console.log(`处理网站: ${website.name} (${website.domain})`)
+    // 3. 只处理当前轮转到的网站
+    try {
+      console.log(`处理网站: ${currentWebsite.name} (${currentWebsite.domain})`)
 
-        // 检查今天已生成的文章数量
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const tomorrow = new Date(today)
-        tomorrow.setDate(tomorrow.getDate() + 1)
+      // 检查今天已生成的文章数量
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
 
-        const todayGeneratedCount = await db
-          .select({ count: count(generationTasks.id) })
-          .from(generationTasks)
-          .where(and(eq(generationTasks.websiteId, website.id), eq(generationTasks.status, 'completed'), gte(generationTasks.completedAt, today), lte(generationTasks.completedAt, tomorrow)))
+      const todayGeneratedCount = await db
+        .select({ count: count(generationTasks.id) })
+        .from(generationTasks)
+        .where(and(eq(generationTasks.websiteId, currentWebsite.id), eq(generationTasks.status, 'completed'), gte(generationTasks.completedAt, today), lte(generationTasks.completedAt, tomorrow)))
 
-        const generatedToday = todayGeneratedCount[0]?.count || 0
+      const generatedToday = todayGeneratedCount[0]?.count || 0
 
-        const maxArticlesPerDay = website.maxArticlesPerDay || 5 // 默认值
-        if (generatedToday >= maxArticlesPerDay) {
-          console.log(`网站 ${website.name} 今日已达到最大生成数量 (${generatedToday}/${maxArticlesPerDay})`)
-          continue
-        }
+      const maxArticlesPerDay = currentWebsite.maxArticlesPerDay || 5 // 默认值
+      if (generatedToday >= maxArticlesPerDay) {
+        console.log(`网站 ${currentWebsite.name} 今日已达到最大生成数量 (${generatedToday}/${maxArticlesPerDay})`)
+        return NextResponse.json({
+          success: true,
+          message: `网站 ${currentWebsite.name} 今日已达到最大生成数量`,
+          data: { processed: 0, generated: 0, website: currentWebsite.name }
+        })
+      }
 
-        // 3. 获取待生成的关键词（优先级高的优先）
-        const remainingSlots = maxArticlesPerDay - generatedToday
-        const pendingKeywords = await db
-          .select()
-          .from(keywordPlans)
-          .where(and(eq(keywordPlans.websiteId, website.id), eq(keywordPlans.status, 'pending'), isNull(keywordPlans.articleId)))
-          .orderBy(desc(keywordPlans.priority), asc(keywordPlans.createdAt))
-          .limit(remainingSlots)
+      // 4. 获取待生成的关键词（优先级高的优先）
+      // 每次轮转只生成1篇文章，避免AI调用过于频繁
+      const pendingKeywords = await db
+        .select()
+        .from(keywordPlans)
+        .where(and(eq(keywordPlans.websiteId, currentWebsite.id), eq(keywordPlans.status, 'pending'), isNull(keywordPlans.articleId)))
+        .orderBy(desc(keywordPlans.priority), asc(keywordPlans.createdAt))
+        .limit(1) // 每次只处理1个关键词
 
-        console.log(`网站 ${website.name} 找到 ${pendingKeywords.length} 个待生成关键词`)
+      console.log(`网站 ${currentWebsite.name} 找到 ${pendingKeywords.length} 个待生成关键词`)
 
-        // 4. 为每个关键词生成文章
-        for (const keywordPlan of pendingKeywords) {
+      if (pendingKeywords.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: `网站 ${currentWebsite.name} 没有待生成的关键词`,
+          data: { processed: 0, generated: 0, website: currentWebsite.name }
+        })
+      }
+
+      // 5. 为关键词生成文章
+      for (const keywordPlan of pendingKeywords) {
           try {
             totalProcessed++
 
@@ -79,7 +99,7 @@ export async function POST(request: NextRequest) {
             const [task] = await db
               .insert(generationTasks)
               .values({
-                websiteId: website.id,
+                websiteId: currentWebsite.id,
                 keywordPlanId: keywordPlan.id,
                 type: 'auto',
                 status: 'processing',
@@ -93,15 +113,15 @@ export async function POST(request: NextRequest) {
             // 更新关键词状态
             await db.update(keywordPlans).set({ status: 'processing' }).where(eq(keywordPlans.id, keywordPlan.id))
 
-            // 5. 调用AI生成文章内容
+            // 6. 调用AI生成文章内容
             const aiResponse = await generateArticleWithAI(keywordPlan.keyword, keywordPlan.searchVolume || undefined, keywordPlan.difficulty || undefined, keywordPlan.competition || undefined, {
-              name: website.name,
-              domain: website.domain,
-              description: website.description || undefined
+              name: currentWebsite.name,
+              domain: currentWebsite.domain,
+              description: currentWebsite.description || undefined
             })
 
             if (aiResponse.success && aiResponse.data) {
-              // 6. 创建文章记录
+              // 7. 创建文章记录
               const slug = generateSlug(aiResponse.data.title)
               const excerpt = extractExcerpt(aiResponse.data.content)
 
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
                 })
                 .returning()
 
-              // 7. 更新关键词计划和生成任务
+              // 8. 更新关键词计划和生成任务
               await Promise.all([
                 db
                   .update(keywordPlans)
@@ -183,16 +203,17 @@ export async function POST(request: NextRequest) {
         }
 
         results.push({
-          website: website.name,
+          website: currentWebsite.name,
           processed: pendingKeywords.length,
-          generated: pendingKeywords.length // 简化统计，实际应该统计成功数量
+          generated: totalGenerated
         })
       } catch (error) {
-        console.error(`处理网站 "${website.name}" 时出错:`, error)
-        results.push({
-          website: website.name,
-          error: error instanceof Error ? error.message : '未知错误'
-        })
+        console.error(`处理网站 "${currentWebsite.name}" 时出错:`, error)
+        return NextResponse.json({
+          success: false,
+          message: `处理网站 "${currentWebsite.name}" 时出错: ${error instanceof Error ? error.message : '未知错误'}`,
+          data: { processed: 0, generated: 0, website: currentWebsite.name }
+        }, { status: 500 })
       }
     }
 
@@ -204,6 +225,7 @@ export async function POST(request: NextRequest) {
       data: {
         processed: totalProcessed,
         generated: totalGenerated,
+        website: currentWebsite.name,
         websites: results
       }
     })
